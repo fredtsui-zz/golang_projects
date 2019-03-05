@@ -12,17 +12,10 @@ var appPath string = "/mm"
 
 var wQueue chan int
 
-var resQueue chan []string
-var baton1, baton2, baton3 chan int
+var baton1 chan int
 var lock chan int
 var count int = 0
 var groupnum int = 0
-
-//var lock sync.Mutex
-
-var rFlag chan int
-
-var entry bool = false
 
 type GeneralResponse struct {
 	ResponseType string   `json:"responseType,omitempty"`
@@ -42,7 +35,6 @@ func main() {
 
 func mmAdmin(g int) { // g is group size
 	wQueue = make(chan int, g)
-	resQueue = make(chan []string, 1)
 	lock = make(chan int, 1) // lock
 	lock <- 1
 	baton1 = make(chan int, g)
