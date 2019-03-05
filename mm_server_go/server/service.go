@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -12,10 +14,12 @@ var appPath string = "/mm"
 
 var wQueue chan int
 
-var baton1 chan int
+var baton1, baton2 chan int
 var lock chan int
 var count int = 0
 var groupnum int = 0
+var groupsize int = 5
+var port int = 8000
 
 type GeneralResponse struct {
 	ResponseType string   `json:"responseType,omitempty"`
@@ -24,30 +28,51 @@ type GeneralResponse struct {
 }
 
 func main() {
+	args := os.Args[1:]
+	if len(args) >= 1 {
+		arg, err := strconv.Atoi(os.Args[1])
+		if err != nil {
+			log.Println("Usage: ", os.Args[0], " [ port [ group_size ]]")
+		} else {
+			port = arg
+		}
+	}
+	if len(args) == 2 {
+		arg, err := strconv.Atoi(os.Args[2])
+		if err != nil {
+			log.Println("Usage: ", os.Args[0], " [ port [ group_size ]]")
+		} else {
+			groupsize = arg
+		}
+	}
+
 	router := mux.NewRouter()
-	go mmAdmin(3)
+	go mmAdmin()
 	router.HandleFunc(appPath+"/test/{message}", testHandler).Methods("GET")
 	router.HandleFunc(appPath+"/{id}", mmHandler).Methods("GET")
-	log.Println("service hosting on: 8000 port")
-	log.Fatal(http.ListenAndServe(":8000", router))
+	portStr := strconv.Itoa(port)
+	log.Println("service hosting on: ", portStr, " port")
+	log.Fatal(http.ListenAndServe(":"+portStr, router))
 
 }
 
-func mmAdmin(g int) { // g is group size
-	wQueue = make(chan int, g)
+func mmAdmin() { // g is group size
+	wQueue = make(chan int, groupsize)
 	lock = make(chan int, 1) // lock
 	lock <- 1
-	baton1 = make(chan int, g)
+	baton1 = make(chan int, groupsize)
+	baton2 = make(chan int, 1)
 	for {
-		if count == g {
+		<-baton2
+		{
 			<-lock
 			log.Println(groupnum)
 			groupnum = groupnum + 1
 			count = 0
-			for i := 0; i < g; i++ {
+			for i := 0; i < groupsize; i++ {
 				wQueue <- groupnum
 			}
-			for i := 0; i < g; i++ {
+			for i := 0; i < groupsize; i++ {
 				<-baton1
 			}
 			lock <- 1
@@ -62,11 +87,12 @@ func mmHandler(w http.ResponseWriter, r *http.Request) {
 	baton1 <- 1
 	<-lock
 	count = count + 1
+	if count == groupsize {
+		baton2 <- 1
+	}
 	lock <- 1
 	resp := new(GeneralResponse)
 	resp.Group = <-wQueue
-	//log.Println(result)
-	//resp.Message = result
 
 	json.NewEncoder(w).Encode(resp)
 }
@@ -77,6 +103,5 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 
 	resp := new(GeneralResponse)
 	resp.ResponseType = "succ"
-	//resp.Message = params["message"]
 	json.NewEncoder(w).Encode(resp)
 }
