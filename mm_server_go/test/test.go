@@ -61,15 +61,15 @@ func getReq(x int) {
 	time.Sleep(time.Duration(rand.Intn(maxTimeout)) * time.Millisecond)
 	s := strconv.Itoa(x)
 	fmt.Println("go getReq: " + s)
-	resp, err := http.Get("http://localhost:8000/mm/" + s)
+	resp, err := http.Get("http://localhost:8080/mm/" + s)
 	if err != nil {
-		fmt.Println("error!")
+		fmt.Print("error!", err)
 		return
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	res := GeneralResponse{}
 	json.Unmarshal(body, &res)
-	fmt.Printf("%d:\t%d\n", x, res.Group)
+	fmt.Printf("%d:\t%d\t%s\n", x, res.Group, res.Message)
 	c <- x
 }

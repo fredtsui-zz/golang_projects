@@ -12,19 +12,25 @@ import (
 
 var appPath string = "/mm"
 
-var wQueue chan int
+var wQueue chan GroupInfo
 
 var baton1, baton2 chan int
 var lock chan int
 var count int = 0
+var members string
 var groupnum int = 0
 var groupsize int = 5
 var port int = 8000
 
 type GeneralResponse struct {
-	ResponseType string   `json:"responseType,omitempty"`
-	Message      []string `json:"message,omitempty"`
-	Group        int      `json:"group,omitempty"`
+	ResponseType string `json:"responseType,omitempty"`
+	Message      string `json:"message,omitempty"`
+	Group        int    `json:"group,omitempty"`
+}
+
+type GroupInfo struct {
+	GroupNum int
+	Members  string
 }
 
 func main() {
@@ -57,7 +63,7 @@ func main() {
 }
 
 func mmAdmin() { // g is group size
-	wQueue = make(chan int, groupsize)
+	wQueue = make(chan GroupInfo, groupsize)
 	lock = make(chan int, 1) // lock
 	lock <- 1
 	baton1 = make(chan int, groupsize)
@@ -69,8 +75,10 @@ func mmAdmin() { // g is group size
 			log.Println(groupnum)
 			groupnum = groupnum + 1
 			count = 0
+			res := GroupInfo{groupnum, members}
+			members = ""
 			for i := 0; i < groupsize; i++ {
-				wQueue <- groupnum
+				wQueue <- res
 			}
 			for i := 0; i < groupsize; i++ {
 				<-baton1
@@ -86,13 +94,16 @@ func mmHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("received: " + id)
 	baton1 <- 1
 	<-lock
+	members = members + " " + id
 	count = count + 1
 	if count == groupsize {
 		baton2 <- 1
 	}
 	lock <- 1
 	resp := new(GeneralResponse)
-	resp.Group = <-wQueue
+	ginfo := <-wQueue
+	resp.Group = ginfo.GroupNum
+	resp.Message = ginfo.Members
 
 	json.NewEncoder(w).Encode(resp)
 }
