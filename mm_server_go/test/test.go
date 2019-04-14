@@ -58,7 +58,9 @@ func main() {
 func getReq(x int) {
 	seed := <-b
 	rand.NewSource(seed)
-	time.Sleep(time.Duration(rand.Intn(maxTimeout)) * time.Millisecond)
+	if maxTimeout != 0 {
+		time.Sleep(time.Duration(rand.Intn(maxTimeout)) * time.Millisecond)
+	}
 	s := strconv.Itoa(x)
 	fmt.Println("go getReq: " + s)
 	resp, err := http.Get("http://localhost:8080/mm/" + s)
